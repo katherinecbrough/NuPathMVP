@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "NuPath (Dev)",
+    "slug": "SafePlace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/nupathLogo.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "packagerOpts": {
+      "host": "0.0.0.0"
+    },
+    "extra": {
+      "appVariant": "development"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anonymous.SafePlace.dev",
+      "icon": "./assets/images/nupathLogo.png"
+    },
+    "android": {
+      "package": "com.anonymous.SafePlace.dev",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/nupathLogo.png"
+      }
+    }
+  }
+}
