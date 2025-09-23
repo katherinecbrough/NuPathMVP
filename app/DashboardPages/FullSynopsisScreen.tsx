@@ -20,7 +20,7 @@ const FullSynopsisScreen = () => {
       copingEffectiveness: "68% success rate",
     },
     wellnessProgress: {
-      therapy: { value: 85, label: "Therapy" },
+      therapy: { value: 85, label: "Coaching" },
       mindfulness: { value: 62, label: "Mindfulness" },
       selfCare: { value: 75, label: "Self-Care" },
       social: { value: 68, label: "Social" },
@@ -105,7 +105,7 @@ const FullSynopsisScreen = () => {
   // );
   // Chart data
   const progressChartData = {
-    labels: ["Therapy", "Mindfulness", "Self-Care", "Social"],
+    labels: ["Coaching", "Mindfulness", "Self-Care", "Social"],
     data: [0.85, 0.62, 0.75, 0.68],
     colors: [Colors.Primary, "#03dac6", "#ffc107", "#4caf50"],
   };

@@ -41,7 +41,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="AI Therapists"
         options={{
-          title: "Therapists",
+          title: "Coach",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="person.2" color={color} />
           ),
@@ -50,7 +50,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="DailyActivity"
         options={{
-          title: "Daily Activity",
+          title: "Activity",
           tabBarIcon: ({ color }) => (
             <MaterialIcons name="directions-run" size={28} color={color} />
           ),

@@ -25,18 +25,18 @@ type Question = {
 const INTAKE_QUESTIONS: Question[] = [
   {
     id: 1,
-    title: "What's your level of experience with therapy?",
+    title: "What's your level of experience with therapy/coaching?",
     type: "single",
     options: [
-      "Just starting out - First time exploring therapy/wellness",
+      "Just starting out - New to exploring therapy/wellness",
       "Some experience - Tried a few sessions or self-help tools",
-      "Very experienced - Regular therapy participant",
+      "Very experienced - Regular  participant",
       "Prefer not to answer",
     ],
   },
   {
     id: 2,
-    title: "Which therapeutic styles resonate with you? (Select up to 3)",
+    title: "Which coaching styles resonate with you? (Select up to 3)",
     type: "multi",
     options: [
       "Structured Guide - Evidence-based and goal-oriented",

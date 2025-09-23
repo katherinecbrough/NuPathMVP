@@ -15,7 +15,9 @@ import {
   Animated,
   Easing,
 } from "react-native";
-
+import { useRoute } from "@react-navigation/native";
+import { RouteProp } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
 import { addEntry, getData } from "../../components/firebaseConfig";
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
@@ -43,6 +45,15 @@ interface AIQuestion {
   question: string;
   answer: string;
 }
+// Define your route parameter types
+type JournalScreenRouteProp = RouteProp<
+  {
+    Journal: {
+      refreshNeeded?: boolean;
+    };
+  },
+  "Journal"
+>;
 
 // First, define the allowed icon names
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
@@ -58,6 +69,7 @@ type JournalTypeIconName =
 
 export default function Journal() {
   const navigation = useNavigation();
+  const route = useRoute<JournalScreenRouteProp>();
   const [isLoading, setIsLoading] = useState(true);
   const [hasEntries, setHasEntries] = useState(false);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -70,11 +82,13 @@ export default function Journal() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
+
   const emojiAnimations = useRef(
     Array(10)
       .fill(0)
@@ -109,6 +123,7 @@ export default function Journal() {
       return dateObj.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
+        year: "numeric",
       });
     } catch (error) {
       console.error("Error formatting date:", error, date);
@@ -133,14 +148,21 @@ export default function Journal() {
     }
   };
   useEffect(() => {
+    if ((route.params as any)?.refreshNeeded) {
+      // Clear the params to prevent infinite refresh
+      (navigation as any).setParams({ refreshNeeded: false });
+
+      // Manually trigger refresh
+      setRefreshTrigger((prev) => prev + 1);
+    }
+  }, [(route.params as any)?.refreshNeeded]);
+  // Replace the entire useFocusEffect with this:
+  useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       const data = await getData(Entries.Users);
 
-      // console.log("after get data");
-      // console.log(data.data[0].journal);
       if (data.data[0].journal) {
-        // console.log("has journal");
         setHasEntries(true);
         const entryData = await getData(Entries.Journal);
         console.log("DATA");
@@ -148,9 +170,6 @@ export default function Journal() {
         if (entryData.data) {
           setEntries(entryData.data);
           const journalContent = entryData.data;
-          // console.log(entryData.data[0].content);
-          //TODO add spinner
-          // Ensure it's an array before setting state
           if (Array.isArray(journalContent)) {
             setEntries(journalContent);
             setIsLoading(false);
@@ -175,8 +194,31 @@ export default function Journal() {
       }
     };
     fetchData();
-  }, []);
+  }, [refreshTrigger]); // This is the key - use useEffect with refreshTrigger dependency
 
+  // Remove the useFocusEffect entirely, or keep it but make sure it calls the same function
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        // Same fetch logic as above
+        setIsLoading(true);
+        const data = await getData(Entries.Users);
+        if (data.data[0].journal) {
+          setHasEntries(true);
+          const entryData = await getData(Entries.Journal);
+          if (entryData.data) {
+            setEntries(entryData.data);
+          }
+        }
+        setIsLoading(false);
+      };
+      fetchData();
+    }, [refreshTrigger]) // Add refreshTrigger here too
+  );
+  // Function to manually trigger refresh
+  const refreshEntries = () => {
+    setRefreshTrigger((prev) => prev + 1);
+  };
   const openEntryDetails = (entry: JournalEntry) => {
     setSelectedEntry(entry);
     setModalVisible(true);
@@ -351,10 +393,16 @@ export default function Journal() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>AI Journal</Text>
-          <TouchableOpacity style={styles.addButton}>
-            <Link href="/JournalPages/NewEntryScreen">
-              <Text style={styles.addButtonText}>+</Text>
-            </Link>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => {
+              (navigation as any).navigate("JournalPages/NewEntryScreen", {
+                onEntrySaved: true,
+              });
+            }}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+            {/* </Link> */}
           </TouchableOpacity>
         </View>
 
@@ -384,14 +432,14 @@ export default function Journal() {
         </View>
 
         {/* Quick Access Buttons */}
-        <View style={styles.buttonRow}>
+        {/* <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.buttonText}>Today's Activity</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton}>
             <Text style={styles.buttonText}>Past Entries</Text>
           </TouchableOpacity>
-        </View>
+        </View> */}
 
         <TouchableOpacity style={styles.analyzeButton}>
           <Link href="/JournalPages/PatternAnalysisScreen">
@@ -404,7 +452,7 @@ export default function Journal() {
           {isLoading ? (
             <ActivityIndicator size="large" color={Colors.Primary} />
           ) : hasEntries && entries.length > 0 ? (
-            entries.map((entry, index) => (
+            entries.reverse().map((entry, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.entryCard}
@@ -431,7 +479,12 @@ export default function Journal() {
                 </Text>
                 <View style={styles.entryFooter}>
                   <Text style={styles.entryTime}>
-                    {entry.date
+                    {entry.date && entry.date instanceof Date
+                      ? entry.date.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : entry.date
                       ? new Date(entry.date).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -514,10 +567,12 @@ export default function Journal() {
 
                   <View style={styles.modalFooter}>
                     <Text style={styles.modalTime}>
-                      {selectedEntry.date.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {selectedEntry.date
+                        ? new Date(selectedEntry.date).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Time not available"}
                     </Text>
                   </View>
 

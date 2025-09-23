@@ -63,7 +63,7 @@ const TherapyOptionsScreen = () => {
         <ScrollView>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Therapy Center</Text>
+            <Text style={styles.title}>Coaching Center</Text>
             <View style={styles.sessionCounter}>
               <Text style={styles.sessionCounterText}>
                 Total Sessions: {sessionCount}
@@ -73,7 +73,7 @@ const TherapyOptionsScreen = () => {
 
           {/* Therapy Options */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Choose Therapy Type</Text>
+            <Text style={styles.sectionTitle}>Choose Coaching Type</Text>
 
             <Link
               href="/AIAgents/Chatbot"
@@ -90,7 +90,7 @@ const TherapyOptionsScreen = () => {
                     />
                   </View>
                   <View style={styles.textContainer}>
-                    <Text style={styles.optionTitle}>AI Chat Therapy</Text>
+                    <Text style={styles.optionTitle}>AI Chat</Text>
                     <Text style={styles.optionDescription}>
                       Text-based support anytime
                     </Text>
@@ -116,7 +116,7 @@ const TherapyOptionsScreen = () => {
                   <View style={styles.textContainer}>
                     <Text style={styles.optionTitle}>AI Voice Call</Text>
                     <Text style={styles.optionDescription}>
-                      Audio therapy sessions
+                      Audio coaching sessions
                     </Text>
                   </View>
                 </View>
@@ -140,7 +140,7 @@ const TherapyOptionsScreen = () => {
                   <View style={styles.textContainer}>
                     <Text style={styles.optionTitle}>AI Video Call</Text>
                     <Text style={styles.optionDescription}>
-                      Face-to-face virtual therapy
+                      Face-to-face virtual coaching
                     </Text>
                   </View>
                 </View>
@@ -162,17 +162,17 @@ const TherapyOptionsScreen = () => {
 
           {/* Therapist Customization */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Therapist Preferences</Text>
+            <Text style={styles.sectionTitle}>Coaching Preferences</Text>
             <TouchableOpacity style={styles.customizeButton}>
               <Link href="/AIAgents/TherapistCustomizationScreen">
                 <MaterialIcons name="tune" size={20} color={Colors.Primary} />
                 <Text style={styles.customizeButtonText}>
-                  Customize Therapist Style
+                  Customize Coach Style
                 </Text>
               </Link>
             </TouchableOpacity>
             <Text style={styles.preferenceText}>
-              Current: Cognitive Behavioral Therapy focus
+              Current: Cognitive Behavioral focus
             </Text>
           </View>
           {/* Homework Assignments */}

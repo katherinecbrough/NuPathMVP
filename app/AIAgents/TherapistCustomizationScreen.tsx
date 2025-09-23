@@ -104,13 +104,13 @@ const TherapistCustomizationScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.header}>Customize Your Therapist</Text>
+      <Text style={styles.header}>Customize Your Coach</Text>
 
       {/* Therapy Approaches */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Therapy Approaches</Text>
+        <Text style={styles.sectionTitle}>Approaches</Text>
         <Text style={styles.sectionSubtitle}>
-          Select which therapeutic techniques you prefer
+          Select which coaching techniques you prefer
         </Text>
         <View style={styles.optionsContainer}>
           {therapyApproaches.map((approach) => (
@@ -133,9 +133,9 @@ const TherapistCustomizationScreen = () => {
 
       {/* Primary Demeanor */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Therapist Demeanor</Text>
+        <Text style={styles.sectionTitle}>Demeanor</Text>
         <Text style={styles.sectionSubtitle}>
-          Choose how your therapist interacts with you
+          Choose how the AI interacts with you
         </Text>
         <View style={styles.optionsContainer}>
           {demeanors.map((demeanor) => (

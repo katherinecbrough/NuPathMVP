@@ -4,8 +4,7 @@ import { app, db, chatsdb } from "./firebaseConfig";
 import { Audio } from "expo-av";
 
 const openai = new OpenAI({
-  apiKey:
-    "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",
+  apiKey: "",
   dangerouslyAllowBrowser: true, // Required for React Native
 });
 

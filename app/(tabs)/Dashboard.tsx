@@ -380,7 +380,7 @@ const Dashboard = () => {
           <TouchableOpacity style={[styles.actionButton, styles.therapyButton]}>
             <Link href="/(tabs)/AI Therapists">
               <MaterialIcons name="healing" size={28} color="white" />
-              <Text style={styles.actionButtonText}>Start Therapy</Text>
+              <Text style={styles.actionButtonText}>Coach Session</Text>
             </Link>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionButton, styles.journalButton]}>
@@ -453,7 +453,7 @@ const Dashboard = () => {
                 )}
               </View>
               <View style={styles.daySummaryItem}>
-                <Text style={styles.daySummaryLabel}>Therapy</Text>
+                <Text style={styles.daySummaryLabel}>Coaching</Text>
                 {getSelectedDayData().hasTherapy ? (
                   <MaterialIcons name="check" size={24} color="#4CAF50" />
                 ) : (
