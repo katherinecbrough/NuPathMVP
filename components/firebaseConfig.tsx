@@ -73,7 +73,26 @@ export const addEntry = async (collection: string, entryData: any) => {
     return { success: false, error: error.message };
   }
 };
+export const deleteEntry = async (collection: string, documentId: string) => {
+  try {
+    const userId = getCurrentUserId();
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
 
+    const deleteEntryCallable = httpsCallable(functions, "deleteEntry");
+    const result = await deleteEntryCallable({
+      collection: collection,
+      documentId: documentId,
+      userId: userId,
+    });
+
+    return { success: true, data: result.data };
+  } catch (error: any) {
+    console.error("Delete entry error:", error.message);
+    return { success: false, error: error.message };
+  }
+};
 export const updateDocument = async (collection: string, updateData: any) => {
   try {
     const user = auth.currentUser;

@@ -7,7 +7,7 @@
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
  */
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const functions = require("firebase-functions");
 const { onRequest, onCall } = require("firebase-functions/https");
 const logger = require("firebase-functions/logger");
@@ -118,10 +118,10 @@ exports.getData = onRequest(async (req, res) => {
         .status(400)
         .json({ error: "Missing collection or userId parameter" });
     }
-    console.log("before connect");
+
     await client.connect();
     const db = client.db("devDatabase");
-    console.log("after connect");
+
     // Query with user ID filter
     const data = await db
       .collection(collectionName)
@@ -193,7 +193,66 @@ exports.addEntry = onCall(async (data, context) => {
     );
   }
 });
+exports.deleteEntry = onCall(async (data, context) => {
+  // 1. Authentication Check (uncomment when ready)
+  // if (!context.auth) {
+  //   throw new functions.https.HttpsError("unauthenticated", "Login required!");
+  // }
 
+  // 2. Validate required parameters
+  if (!data.data.collection || !data.data.documentId || !data.data.userId) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "Missing required fields: collection, documentId, or userId"
+    );
+  }
+
+  try {
+    await client.connect();
+    const db = client.db("devDatabase");
+
+    // 3. Security: Verify user owns the document before deleting
+    const existingDoc = await db.collection(data.data.collection).findOne({
+      _id: new ObjectId(data.data.documentId),
+      userId: data.data.userId,
+    });
+
+    if (!existingDoc) {
+      throw new functions.https.HttpsError(
+        "not-found",
+        "Document not found or access denied"
+      );
+    }
+
+    // 4. Perform deletion
+    const deleteResult = await db.collection(data.data.collection).deleteOne({
+      _id: new ObjectId(data.data.documentId),
+      userId: data.data.userId, // Double-check ownership at deletion time
+    });
+
+    if (deleteResult.deletedCount === 0) {
+      throw new functions.https.HttpsError(
+        "aborted",
+        "Document was not deleted"
+      );
+    }
+
+    return {
+      success: true,
+      documentId: data.data.documentId,
+      collection: data.data.collection,
+      message: "Entry deleted successfully",
+    };
+  } catch (error) {
+    console.error("Delete error:", error);
+    throw new functions.https.HttpsError(
+      "internal",
+      error.message || "Failed to delete entry"
+    );
+  } finally {
+    await client.close();
+  }
+});
 exports.updateDocument = onCall(async (data, context) => {
   // 1. Authentication Check
   //   if (!context.auth) {

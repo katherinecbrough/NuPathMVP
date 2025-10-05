@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,11 @@ import {
 import { useRoute } from "@react-navigation/native";
 import { RouteProp } from "@react-navigation/native";
 import { useFocusEffect } from "@react-navigation/native";
-import { addEntry, getData } from "../../components/firebaseConfig";
+import {
+  addEntry,
+  getData,
+  deleteEntry,
+} from "../../components/firebaseConfig"; // Import deleteEntry
 import { SafeAreaView, SafeAreaProvider } from "react-native-safe-area-context";
 import { MaterialIcons, Feather } from "@expo/vector-icons";
 import { Link, useNavigation } from "expo-router";
@@ -32,20 +36,21 @@ import {
 } from "../../constants/Enums";
 
 interface JournalEntry {
-  // id: string | null;
+  _id: string; // Add _id field for MongoDB document ID
   date: Date;
   type: string;
   template: string;
   templateId: number;
   question: string;
   content: string | AIQuestion[];
+  userId?: string; // Add userId for safety
 }
 interface AIQuestion {
   id: number;
   question: string;
   answer: string;
 }
-// Define your route parameter types
+
 type JournalScreenRouteProp = RouteProp<
   {
     Journal: {
@@ -55,17 +60,15 @@ type JournalScreenRouteProp = RouteProp<
   "Journal"
 >;
 
-// First, define the allowed icon names
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
-
-// Then define the specific icon names we'll use
 type JournalTypeIconName =
   | "wb-sunny"
   | "nights-stay"
   | "keyboard-voice"
   | "photo-camera"
   | "list"
-  | "edit";
+  | "edit"
+  | "delete"; // Add delete icon
 
 export default function Journal() {
   const navigation = useNavigation();
@@ -83,17 +86,29 @@ export default function Journal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false); // New state for delete confirmation
+  const [entryToDelete, setEntryToDelete] = useState<JournalEntry | null>(null); // Track which entry to delete
+  const [isDeleting, setIsDeleting] = useState(false); // Loading state for delete operation
+
   const scrollViewRef = useRef<ScrollView>(null);
   const textInputRef = useRef<TextInput>(null);
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const bounceAnim = useRef(new Animated.Value(0)).current;
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA; // Newest first
+    });
+  }, [entries]);
 
   const emojiAnimations = useRef(
     Array(10)
       .fill(0)
       .map(() => new Animated.Value(0))
   ).current;
+
   const formatDate = (date: any): string => {
     try {
       let dateObj: Date;
@@ -101,7 +116,6 @@ export default function Journal() {
       if (date instanceof Date) {
         dateObj = date;
       } else if (typeof date === "string") {
-        // Handle ISO string
         dateObj = new Date(date);
       } else {
         dateObj = new Date();
@@ -130,7 +144,7 @@ export default function Journal() {
       return "Date error";
     }
   };
-  // Update the getTypeIcon function with proper typing
+
   const getTypeIcon = (type: string): JournalTypeIconName => {
     switch (type) {
       case "morning":
@@ -147,16 +161,14 @@ export default function Journal() {
         return "edit";
     }
   };
+
   useEffect(() => {
     if ((route.params as any)?.refreshNeeded) {
-      // Clear the params to prevent infinite refresh
       (navigation as any).setParams({ refreshNeeded: false });
-
-      // Manually trigger refresh
       setRefreshTrigger((prev) => prev + 1);
     }
   }, [(route.params as any)?.refreshNeeded]);
-  // Replace the entire useFocusEffect with this:
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -194,13 +206,11 @@ export default function Journal() {
       }
     };
     fetchData();
-  }, [refreshTrigger]); // This is the key - use useEffect with refreshTrigger dependency
+  }, [refreshTrigger]);
 
-  // Remove the useFocusEffect entirely, or keep it but make sure it calls the same function
   useFocusEffect(
     React.useCallback(() => {
       const fetchData = async () => {
-        // Same fetch logic as above
         setIsLoading(true);
         const data = await getData(Entries.Users);
         if (data.data[0].journal) {
@@ -213,24 +223,80 @@ export default function Journal() {
         setIsLoading(false);
       };
       fetchData();
-    }, [refreshTrigger]) // Add refreshTrigger here too
+    }, [refreshTrigger])
   );
-  // Function to manually trigger refresh
+
   const refreshEntries = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
+
   const openEntryDetails = (entry: JournalEntry) => {
     setSelectedEntry(entry);
     setModalVisible(true);
   };
+
+  // New function to handle delete confirmation
+  // Update your handleDeletePress function
+  const handleDeletePress = (entry: JournalEntry) => {
+    setEntryToDelete(entry);
+    setModalVisible(false); // Close the entry modal first
+    // Use a small timeout to ensure the first modal is closed
+    setTimeout(() => {
+      setDeleteConfirmVisible(true);
+    }, 100);
+  };
+
+  // New function to confirm and execute deletion
+  const confirmDelete = async () => {
+    if (!entryToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      console.log("delete object");
+      console.log(entryToDelete._id);
+      const result = await deleteEntry(Entries.Journal, entryToDelete._id);
+
+      if (result.success) {
+        // Remove the entry from local state
+        setEntries((prevEntries) =>
+          prevEntries.filter((entry) => entry._id !== entryToDelete._id)
+        );
+
+        // Check if we have any entries left
+        if (entries.length <= 1) {
+          setHasEntries(false);
+        }
+
+        // Close both modals
+        setModalVisible(false);
+        setDeleteConfirmVisible(false);
+
+        // Show success message
+        Alert.alert("Success", "Journal entry deleted successfully");
+      } else {
+        Alert.alert("Error", "Failed to delete journal entry: " + result.error);
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      Alert.alert("Error", "An unexpected error occurred while deleting");
+    } finally {
+      setIsDeleting(false);
+      setEntryToDelete(null);
+    }
+  };
+
+  // New function to cancel deletion
+  const cancelDelete = () => {
+    setDeleteConfirmVisible(false);
+    setEntryToDelete(null);
+  };
+
   const startCelebration = () => {
-    // Reset animations
     scaleAnim.setValue(0);
     rotateAnim.setValue(0);
     bounceAnim.setValue(0);
     emojiAnimations.forEach((anim) => anim.setValue(0));
 
-    // Main modal animation
     Animated.parallel([
       Animated.spring(scaleAnim, {
         toValue: 1,
@@ -266,7 +332,6 @@ export default function Journal() {
       ),
     ]).start();
 
-    // Emoji celebration animation
     emojiAnimations.forEach((anim, index) => {
       Animated.sequence([
         Animated.delay(index * 100),
@@ -303,19 +368,19 @@ export default function Journal() {
       setShowSuccessModal(false);
     });
   };
+
   const handleGenerateJournal = async () => {
     if (!searchQuery.trim()) return;
 
     setIsGenerating(true);
     try {
       const aiResponse = await getAIResponse("journal", searchQuery);
-      // Split the AI response into questions
       const questions = aiResponse
         .split("\n")
         .filter((line) => line.trim().length > 0)
         .map((question, key) => ({
           id: key,
-          question: question.replace(/^\d+\.\s*/, "").trim(), // Remove numbering if present
+          question: question.replace(/^\d+\.\s*/, "").trim(),
           answer: "",
         }));
 
@@ -340,9 +405,8 @@ export default function Journal() {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       setIsSubmitting(true);
-      // Create journal entry from all answers
-
       const newEntry: JournalEntry = {
+        _id: "", // This will be generated by MongoDB
         type: JournalEntryType.AIPrompt,
         template: JournalTemplate.AIPrompt,
         templateId: JournalTemplateID.AIPrompt,
@@ -356,10 +420,9 @@ export default function Journal() {
           setHasEntries(true);
           setEntries((prevEntries) => [newEntry, ...prevEntries]);
           setShowSuccessModal(true);
-          setTimeout(startCelebration, 100); // Start animation after modal is shown
+          setTimeout(startCelebration, 100);
         } else {
           console.error("Failed to save answers:", result.error);
-          // Consider showing an error to the user
           Alert.alert(
             "Error",
             "Failed to save your answers. Please try again."
@@ -367,12 +430,8 @@ export default function Journal() {
         }
       } catch (e) {
         console.error("Failed to save answers:");
-        // Consider showing an error to the user
         Alert.alert("Error", "Failed to save your answers. Please try again.");
       }
-      //TODO add something so if theres an error a message that come on the entry saying "not saved"
-      //or store it in the phone until they get wifi
-      //setEntries([newEntry, ...(entries || [])]);
       setIsSubmitting(false);
       setAiQuestionsModalVisible(false);
       setSearchQuery("");
@@ -402,7 +461,6 @@ export default function Journal() {
             }}
           >
             <Text style={styles.addButtonText}>+</Text>
-            {/* </Link> */}
           </TouchableOpacity>
         </View>
 
@@ -431,16 +489,6 @@ export default function Journal() {
           </View>
         </View>
 
-        {/* Quick Access Buttons */}
-        {/* <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.buttonText}>Today's Activity</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.buttonText}>Past Entries</Text>
-          </TouchableOpacity>
-        </View> */}
-
         <TouchableOpacity style={styles.analyzeButton}>
           <Link href="/JournalPages/PatternAnalysisScreen">
             <Text style={styles.analyzeButtonText}>Analyze My Patterns</Text>
@@ -452,7 +500,7 @@ export default function Journal() {
           {isLoading ? (
             <ActivityIndicator size="large" color={Colors.Primary} />
           ) : hasEntries && entries.length > 0 ? (
-            entries.reverse().map((entry, index) => (
+            sortedEntries.map((entry, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.entryCard}
@@ -506,13 +554,14 @@ export default function Journal() {
         </ScrollView>
 
         {/* Entry Detail Modal */}
+        {/* Entry Detail Modal */}
         <Modal
           animationType="slide"
           transparent={true}
           visible={modalVisible}
           onRequestClose={() => setModalVisible(false)}
         >
-          <View style={styles.modalContainer}>
+          <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               {selectedEntry && (
                 <>
@@ -539,33 +588,39 @@ export default function Journal() {
                     {selectedEntry.question}
                   </Text>
 
-                  <ScrollView style={styles.modalTextContainer}>
-                    {Array.isArray(selectedEntry.content) ? (
-                      // Render Q&A if content is an array
-                      selectedEntry.content.map((qa, index) => (
-                        <View key={index} style={styles.qaContainer}>
-                          <Text style={styles.questionText}>
-                            <Text style={styles.bold}>Q{index + 1}: </Text>
-                            {qa.question}
-                          </Text>
-                          <Text style={styles.answerText}>
-                            <Text style={styles.bold}>A: </Text>
-                            {qa.answer}
-                          </Text>
-                          {index < selectedEntry.content.length - 1 && (
-                            <View style={styles.separator} />
-                          )}
-                        </View>
-                      ))
-                    ) : (
-                      // Render as plain text if content is a string
-                      <Text style={styles.modalText}>
-                        {selectedEntry.content || "No content"}
-                      </Text>
-                    )}
-                  </ScrollView>
+                  {/* Scrollable content area */}
+                  <View style={styles.scrollableContent}>
+                    <ScrollView
+                      style={styles.modalTextContainer}
+                      contentContainerStyle={styles.scrollViewContent}
+                      showsVerticalScrollIndicator={true}
+                    >
+                      {Array.isArray(selectedEntry.content) ? (
+                        selectedEntry.content.map((qa, index) => (
+                          <View key={index} style={styles.qaContainer}>
+                            <Text style={styles.questionText}>
+                              <Text style={styles.bold}>Q{index + 1}: </Text>
+                              {qa.question}
+                            </Text>
+                            <Text style={styles.answerText}>
+                              <Text style={styles.bold}>A: </Text>
+                              {qa.answer}
+                            </Text>
+                            {index < selectedEntry.content.length - 1 && (
+                              <View style={styles.separator} />
+                            )}
+                          </View>
+                        ))
+                      ) : (
+                        <Text style={styles.modalText}>
+                          {selectedEntry.content || "No content"}
+                        </Text>
+                      )}
+                    </ScrollView>
+                  </View>
 
-                  <View style={styles.modalFooter}>
+                  {/* Footer with buttons */}
+                  <View style={styles.modalFooterWithActions}>
                     <Text style={styles.modalTime}>
                       {selectedEntry.date
                         ? new Date(selectedEntry.date).toLocaleTimeString([], {
@@ -574,20 +629,75 @@ export default function Journal() {
                           })
                         : "Time not available"}
                     </Text>
-                  </View>
 
-                  <Pressable
-                    style={styles.modalCloseButton}
-                    onPress={() => setModalVisible(false)}
-                  >
-                    <Text style={styles.modalCloseButtonText}>Close</Text>
-                  </Pressable>
+                    <View style={styles.modalActions}>
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.deleteButton]}
+                        onPress={() => handleDeletePress(selectedEntry)}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialIcons name="delete" size={20} color="white" />
+                        <Text style={styles.deleteButtonText}>Delete</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.closeButton]}
+                        onPress={() => setModalVisible(false)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.closeButtonText}>Close</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </>
               )}
             </View>
           </View>
         </Modal>
+        {/* Delete Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={deleteConfirmVisible}
+          onRequestClose={cancelDelete}
+        >
+          <View style={styles.confirmModalContainer}>
+            <Pressable
+              style={styles.confirmModalContent}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={styles.confirmModalTitle}>Delete Journal Entry</Text>
+              <Text style={styles.confirmModalText}>
+                Are you sure you want to delete this journal entry? This action
+                cannot be undone.
+              </Text>
 
+              <View style={styles.confirmModalActions}>
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.cancelButton]}
+                  onPress={cancelDelete}
+                  disabled={isDeleting}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.confirmButton, styles.deleteConfirmButton]}
+                  onPress={confirmDelete}
+                  disabled={isDeleting}
+                  activeOpacity={0.7}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <Text style={styles.deleteConfirmButtonText}>Delete</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </View>
+        </Modal>
         {/* Loading Modal */}
         <Modal animationType="fade" transparent={true} visible={isGenerating}>
           <View style={styles.loadingContainer}>
@@ -600,7 +710,6 @@ export default function Journal() {
           </View>
         </Modal>
 
-        {/* AI Questions Modal */}
         {/* AI Questions Modal */}
         <Modal
           animationType="slide"
@@ -686,7 +795,6 @@ export default function Journal() {
     </SafeAreaProvider>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -808,7 +916,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "90%",
-    maxHeight: "90%",
+    height: "80%", // Fixed height instead of maxHeight
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
@@ -853,8 +961,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   modalTextContainer: {
-    maxHeight: "60%",
-    marginBottom: 15,
+    // maxHeight: "60%",
+    // marginBottom: 15,
+    flex: 1,
   },
   modalText: {
     fontSize: 16,
@@ -974,7 +1083,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollViewContent: {
-    flexGrow: 1,
+    // flexGrow: 1,
+    paddingBottom: 10,
   },
   disabledButton: {
     opacity: 0.6,
@@ -1111,11 +1221,115 @@ const styles = StyleSheet.create({
   },
 
   // Make buttons more prominent
+  //   modalButton: {
+  //     padding: 15, // Increased from 12 to 15
+  //     borderRadius: 10, // Increased from 8 to 10
+  //     minWidth: 120, // Increased from 100 to 120
+  //     alignItems: "center",
+  //     marginHorizontal: 8, // Add spacing between buttons
+  //   },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+    gap: 10, // Add gap between buttons
+  },
   modalButton: {
-    padding: 15, // Increased from 12 to 15
-    borderRadius: 10, // Increased from 8 to 10
-    minWidth: 120, // Increased from 100 to 120
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
     alignItems: "center",
-    marginHorizontal: 8, // Add spacing between buttons
+    justifyContent: "center",
+    flexDirection: "row",
+    marginHorizontal: 5,
+    minHeight: 44, // Minimum touch target size for accessibility
+  },
+  deleteButton: {
+    backgroundColor: "#ff3b30",
+  },
+  closeButton: {
+    backgroundColor: Colors.Primary,
+  },
+  deleteButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    marginLeft: 5,
+  },
+  closeButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+
+  // Delete confirmation modal styles
+  confirmModalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  confirmModalContent: {
+    backgroundColor: "white",
+    padding: 24,
+    borderRadius: 16,
+    width: "80%",
+    maxWidth: 300,
+    alignItems: "center",
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  confirmModalText: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  confirmModalActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    gap: 10,
+  },
+  confirmButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+    minHeight: 44,
+  },
+  cancelButton: {
+    backgroundColor: "#f0f0f0",
+  },
+  deleteConfirmButton: {
+    backgroundColor: "#ff3b30",
+  },
+  cancelButtonText: {
+    color: "#333",
+    fontWeight: "bold",
+  },
+  deleteConfirmButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+
+  scrollableContent: {
+    height: "65%", // Takes 65% of modal height
+    marginBottom: 15,
+  },
+  modalFooterWithActions: {
+    marginTop: "auto", // Pushes to bottom
   },
 });
